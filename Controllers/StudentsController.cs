@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using HertfordshireUniversity.Data;
 using HertfordshireUniversity.Models;
+using HertfordshireUniversity.ViewModels;
 
 namespace HertfordshireUniversity.Controllers
 {
@@ -56,15 +57,32 @@ namespace HertfordshireUniversity.Controllers
         // POST: Students/Create
         // To protect from overposting attacks, please enable the specific properties you want to bind to, for 
         // more details see http://go.microsoft.com/fwlink/?LinkId=317598.
+
+        public StudentViewModel studentViewModel { get; set; }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("ID,LastName,FirstMidName,EnrollmentDate")] Student student)
+        public async Task<IActionResult> Create([Bind("LastName,FirstMidName,EnrollmentDate")] Student student)
         {
-            if (ModelState.IsValid)
+            try
             {
-                _context.Add(student);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                if (ModelState.IsValid)
+                {
+                    _context.Add(student);
+                    await _context.SaveChangesAsync();
+                    return RedirectToAction(nameof(Index));
+                    // var entry = _context.Add(new Student());
+                    // entry.CurrentValues.SetValues(studentViewModel);
+                    // await _context.SaveChangesAsync();
+                    //return RedirectToAction(nameof(Index));
+                }
+            }
+            catch (DbUpdateException /* ex */)
+            {
+                //Log the error (uncomment ex variable name and write a log.
+                ModelState.AddModelError("", "Unable to save changes." +
+                    "try again if the problem persists" +
+                    "see your system administrator.");
             }
             return View(student);
         }
@@ -88,37 +106,39 @@ namespace HertfordshireUniversity.Controllers
         // POST: Students/Edit/5
         // To protect from overposting attacks, please enable the specific properties you want to bind to, for 
         // more details see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
+        [HttpPost, ActionName("Edit")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("ID,LastName,FirstMidName,EnrollmentDate")] Student student)
+        public async Task<IActionResult> EditPost(int? id)
         {
-            if (id != student.ID)
+            if (id != null)
             {
                 return NotFound();
             }
 
-            if (ModelState.IsValid)
+            var studentToUpdate = await _context.Students.FirstOrDefaultAsync(x => x.ID == id);
+
+            if (await TryUpdateModelAsync<Student>(
+                studentToUpdate, "", s => s.FirstMidName, s => s.LastName, s => s.EnrollmentDate))
             {
-                try
+                if (ModelState.IsValid)
                 {
-                    _context.Update(student);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!StudentExists(student.ID))
+                    try
                     {
-                        return NotFound();
+                        await _context.SaveChangesAsync();
+                        return RedirectToAction(nameof(Index));
                     }
-                    else
+                    catch (DbUpdateException)
                     {
-                        throw;
+                        ModelState.AddModelError("", "Unable to save changes" +
+                            "Try agin, if the problem persists," +
+                            "see your system administrator.");
                     }
                 }
-                return RedirectToAction(nameof(Index));
             }
-            return View(student);
+            return View(studentToUpdate);
         }
+
+
 
         // GET: Students/Delete/5
         public async Task<IActionResult> Delete(int? id)
