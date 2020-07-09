@@ -1,0 +1,35 @@
+﻿@model IEnumerable<HertfordshireUniversity.ViewModels.EnrollmentDateGroup>
+
+@{
+    ViewData["Title"] = "Student Body Statistics";
+}
+
+    <h1>Student Body Statistics</h1>
+
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                Enrollment Date
+            </th>
+            <th>
+                Students
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.EnrollmentDate)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.StudentCount)
+            </td>
+            
+        </tr>
+}
+    </tbody>
+</table>
