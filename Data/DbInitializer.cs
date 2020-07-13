@@ -10,7 +10,7 @@ namespace HertfordshireUniversity.Data
     {
         public static void Initialize(SchoolContext context)
         {
-            context.Database.EnsureCreated();
+            //context.Database.EnsureCreated();     //Remove EnsureCreated by comment
 
             // Look for any students.
             if (context.Students.Any())
