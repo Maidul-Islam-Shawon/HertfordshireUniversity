@@ -136,8 +136,8 @@ namespace HertfordshireUniversity.Controllers
 
             var instructor = await _context.Instructors
                             .Include(m => m.OfficeAssignment)
-                            .Include(m=>m.CourseAssignments)
-                                .ThenInclude(m=>m.Course)
+                            .Include(m => m.CourseAssignments)
+                                .ThenInclude(m => m.Course)
                             .AsNoTracking()
                             .FirstOrDefaultAsync(i => i.ID == id);
             if (instructor == null)
@@ -151,9 +151,9 @@ namespace HertfordshireUniversity.Controllers
         // POST: Instructors/Edit/5
         // To protect from overposting attacks, please enable the specific properties you want to bind to, for 
         // more details see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost, ActionName("Edit")]
+        [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditPost(int? id)
+        public async Task<IActionResult> Edit(int? id, string[] selectedCourses)
         {
             if (id == null)
             {
@@ -162,6 +162,8 @@ namespace HertfordshireUniversity.Controllers
 
             var instructorToUpdate = await _context.Instructors
                                     .Include(m => m.OfficeAssignment)
+                                    .Include(m => m.CourseAssignments)
+                                        .ThenInclude(m => m.Course)
                                     .FirstOrDefaultAsync(m => m.ID == id);
 
             if (await TryUpdateModelAsync<Instructor>(
@@ -172,6 +174,8 @@ namespace HertfordshireUniversity.Controllers
                 {
                     instructorToUpdate.OfficeAssignment = null;
                 }
+
+                UpdateInstructorCourses(selectedCourses, instructorToUpdate);
 
                 try
                 {
@@ -186,6 +190,10 @@ namespace HertfordshireUniversity.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
+
+            UpdateInstructorCourses(selectedCourses, instructorToUpdate);
+            PopulateAssignedCourseData(instructorToUpdate);
+
             return View(instructorToUpdate);
         }
 
@@ -229,16 +237,49 @@ namespace HertfordshireUniversity.Controllers
             var instructorCourse = new HashSet<int>(instructor.CourseAssignments.Select(c => c.CourseID));
             var viewModel = new List<AssignedCourseData>();
 
-            foreach(var course in allCourse)
+            foreach (var course in allCourse)
             {
                 viewModel.Add(new AssignedCourseData
                 {
                     CourseID = course.CourseID,
-                    Title=course.Title,
+                    Title = course.Title,
                     Assigned = instructorCourse.Contains(course.CourseID)
                 });
             }
             ViewData["Course"] = viewModel;
+        }
+
+
+        private void UpdateInstructorCourses(string[] selectedCourses, Instructor instructorToUpdate)
+        {
+            if (selectedCourses == null)
+            {
+                instructorToUpdate.CourseAssignments = new List<CourseAssignment>();
+                return;
+            }
+
+            var selectedCoursesHS = new HashSet<string>(selectedCourses);
+            var instructorCourses = new HashSet<int>
+                (instructorToUpdate.CourseAssignments.Select(c => c.Course.CourseID));
+            foreach (var course in _context.Courses)
+            {
+                if (selectedCoursesHS.Contains(course.CourseID.ToString()))
+                {
+                    if (!instructorCourses.Contains(course.CourseID))
+                    {
+                        instructorToUpdate.CourseAssignments.Add(new CourseAssignment { InstructorID = instructorToUpdate.ID, CourseID = course.CourseID });
+                    }
+                }
+                else
+                {
+
+                    if (instructorCourses.Contains(course.CourseID))
+                    {
+                        CourseAssignment courseToRemove = instructorToUpdate.CourseAssignments.FirstOrDefault(i => i.CourseID == course.CourseID);
+                        _context.Remove(courseToRemove);
+                    }
+                }
+            }
         }
     }
 }
