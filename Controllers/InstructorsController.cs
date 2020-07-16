@@ -25,20 +25,33 @@ namespace HertfordshireUniversity.Controllers
         {
             var viewModel = new InstructorIndexData();
 
+            //........eager loading........//
+
+            //viewModel.Instructors = await _context.Instructors
+            //                        .Include(i => i.OfficeAssignment)
+            //                        .Include(i => i.CourseAssignments)
+            //                            .ThenInclude(i => i.Course)
+            //                                .ThenInclude(i => i.Enrollments)
+            //                                    .ThenInclude(i => i.Student)
+            //                        .Include(i => i.CourseAssignments)
+            //                            .ThenInclude(i => i.Course)
+            //                                .ThenInclude(i => i.Department)
+            //                        .AsNoTracking()
+            //                        .OrderBy(i => i.LastName)
+            //                        .ToListAsync();
+
+
+
             viewModel.Instructors = await _context.Instructors
                                     .Include(i => i.OfficeAssignment)
                                     .Include(i => i.CourseAssignments)
                                         .ThenInclude(i => i.Course)
-                                            .ThenInclude(i => i.Enrollments)
-                                                .ThenInclude(i => i.Student)
-                                    .Include(i => i.CourseAssignments)
-                                        .ThenInclude(i => i.Course)
                                             .ThenInclude(i => i.Department)
-                                    .AsNoTracking()
+                                            
                                     .OrderBy(i => i.LastName)
                                     .ToListAsync();
 
-            if(id != null)
+            if (id != null)
             {
                 ViewData["InstructorID"] = id.Value;
                 Instructor instructor = viewModel.Instructors.Where(i => i.ID == id.Value).Single();
@@ -46,11 +59,26 @@ namespace HertfordshireUniversity.Controllers
                 viewModel.Courses = instructor.CourseAssignments.Select(i => i.Course);
             }
 
-            if(courseID != null)
+            //........use this with eager loading...........//
+
+            //if(courseID != null)
+            //{
+            //    ViewData["CourseID"] = courseID.Value;
+            //    viewModel.Enrollments = viewModel.Courses.
+            //                            Where(i => i.CourseID == courseID).Single().Enrollments;
+            //}
+
+            if (courseID != null)
             {
                 ViewData["CourseID"] = courseID.Value;
-                viewModel.Enrollments = viewModel.Courses.
-                                        Where(i => i.CourseID == courseID).Single().Enrollments;
+                var selectedCourse = viewModel.Courses.Where(x => x.CourseID == courseID).Single();
+                await _context.Entry(selectedCourse).Collection(x => x.Enrollments).LoadAsync();
+
+                foreach (Enrollment enrollment in selectedCourse.Enrollments)
+                {
+                    await _context.Entry(enrollment).Reference(x => x.Student).LoadAsync();
+                }
+                viewModel.Enrollments = selectedCourse.Enrollments;
             }
 
             return View(viewModel);
