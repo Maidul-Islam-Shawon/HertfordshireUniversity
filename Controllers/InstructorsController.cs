@@ -47,15 +47,16 @@ namespace HertfordshireUniversity.Controllers
                                     .Include(i => i.CourseAssignments)
                                         .ThenInclude(i => i.Course)
                                             .ThenInclude(i => i.Department)
-                                            
+
                                     .OrderBy(i => i.LastName)
                                     .ToListAsync();
 
             if (id != null)
             {
                 ViewData["InstructorID"] = id.Value;
-                Instructor instructor = viewModel.Instructors.Where(i => i.ID == id.Value).Single();
-
+                //Instructor instructor = viewModel.Instructors.Where(i => i.ID == id.Value).Single();
+                //....or....//
+                Instructor instructor = viewModel.Instructors.Single(i => i.ID == id.Value);
                 viewModel.Courses = instructor.CourseAssignments.Select(i => i.Course);
             }
 
@@ -133,47 +134,59 @@ namespace HertfordshireUniversity.Controllers
                 return NotFound();
             }
 
-            var instructor = await _context.Instructors.FindAsync(id);
+            var instructor = await _context.Instructors
+                            .Include(m => m.OfficeAssignment)
+                            .Include(m=>m.CourseAssignments)
+                                .ThenInclude(m=>m.Course)
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(i => i.ID == id);
             if (instructor == null)
             {
                 return NotFound();
             }
+            PopulateAssignedCourseData(instructor);
             return View(instructor);
         }
 
         // POST: Instructors/Edit/5
         // To protect from overposting attacks, please enable the specific properties you want to bind to, for 
         // more details see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
+        [HttpPost, ActionName("Edit")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("ID,LastName,FirstMidName,HireDate")] Instructor instructor)
+        public async Task<IActionResult> EditPost(int? id)
         {
-            if (id != instructor.ID)
+            if (id == null)
             {
                 return NotFound();
             }
 
-            if (ModelState.IsValid)
+            var instructorToUpdate = await _context.Instructors
+                                    .Include(m => m.OfficeAssignment)
+                                    .FirstOrDefaultAsync(m => m.ID == id);
+
+            if (await TryUpdateModelAsync<Instructor>(
+                instructorToUpdate, "",
+                i => i.FirstMidName, i => i.LastName, i => i.HireDate, i => i.OfficeAssignment))
             {
+                if (string.IsNullOrWhiteSpace(instructorToUpdate.OfficeAssignment?.Location))
+                {
+                    instructorToUpdate.OfficeAssignment = null;
+                }
+
                 try
                 {
-                    _context.Update(instructor);
                     await _context.SaveChangesAsync();
                 }
-                catch (DbUpdateConcurrencyException)
+                catch (DbUpdateException)
                 {
-                    if (!InstructorExists(instructor.ID))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
+                    //Log the error (uncomment ex variable name and write a log.)
+                    ModelState.AddModelError("", "Unable to save changes. " +
+                        "Try again, and if the problem persists, " +
+                        "see your system administrator.");
                 }
                 return RedirectToAction(nameof(Index));
             }
-            return View(instructor);
+            return View(instructorToUpdate);
         }
 
         // GET: Instructors/Delete/5
@@ -208,6 +221,24 @@ namespace HertfordshireUniversity.Controllers
         private bool InstructorExists(int id)
         {
             return _context.Instructors.Any(e => e.ID == id);
+        }
+
+        private void PopulateAssignedCourseData(Instructor instructor)
+        {
+            var allCourse = _context.Courses;
+            var instructorCourse = new HashSet<int>(instructor.CourseAssignments.Select(c => c.CourseID));
+            var viewModel = new List<AssignedCourseData>();
+
+            foreach(var course in allCourse)
+            {
+                viewModel.Add(new AssignedCourseData
+                {
+                    CourseID = course.CourseID,
+                    Title=course.Title,
+                    Assigned = instructorCourse.Contains(course.CourseID)
+                });
+            }
+            ViewData["Course"] = viewModel;
         }
     }
 }
