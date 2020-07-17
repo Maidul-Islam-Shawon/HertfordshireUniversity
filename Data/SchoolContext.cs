@@ -39,6 +39,9 @@ namespace HertfordshireUniversity.Data
             //This code configures the CourseAssignment entity's composite primary key.
             modelBuilder.Entity<CourseAssignment>()
                 .HasKey(x => new { x.CourseID, x.InstructorID });
+
+            modelBuilder.Entity<Department>()
+                .Property(p => p.RowVersion).IsConcurrencyToken();
         }
     }
 }

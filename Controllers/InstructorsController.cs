@@ -107,6 +107,10 @@ namespace HertfordshireUniversity.Controllers
         // GET: Instructors/Create
         public IActionResult Create()
         {
+            var instructor = new Instructor();
+            instructor.CourseAssignments = new List<CourseAssignment>();
+            PopulateAssignedCourseData(instructor);
+
             return View();
         }
 
@@ -115,14 +119,31 @@ namespace HertfordshireUniversity.Controllers
         // more details see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("ID,LastName,FirstMidName,HireDate")] Instructor instructor)
+        public async Task<IActionResult> Create([Bind("LastName,FirstMidName,HireDate,OfficeAssignment")] Instructor instructor, string[] selectedCourses)
         {
+            if(selectedCourses != null)
+            {
+                instructor.CourseAssignments = new List<CourseAssignment>();
+
+                foreach(var course in selectedCourses)
+                {
+                    var courseToAdd = new CourseAssignment
+                    {
+                        InstructorID = instructor.ID,
+                        CourseID = int.Parse(course)
+                    };
+
+                    instructor.CourseAssignments.Add(courseToAdd);
+                }
+            }
+
             if (ModelState.IsValid)
             {
                 _context.Add(instructor);
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
+            PopulateAssignedCourseData(instructor);
             return View(instructor);
         }
 
@@ -140,10 +161,12 @@ namespace HertfordshireUniversity.Controllers
                                 .ThenInclude(m => m.Course)
                             .AsNoTracking()
                             .FirstOrDefaultAsync(i => i.ID == id);
+
             if (instructor == null)
             {
                 return NotFound();
             }
+
             PopulateAssignedCourseData(instructor);
             return View(instructor);
         }
@@ -220,8 +243,18 @@ namespace HertfordshireUniversity.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var instructor = await _context.Instructors.FindAsync(id);
+            var instructor = await _context.Instructors
+                             .Include(x => x.CourseAssignments)
+                             .SingleAsync(x => x.ID == id);
+
+            var departments = await _context.Departments
+                               .Where(x => x.InstructorID == id)
+                               .ToListAsync();
+
+            departments.ForEach(d => d.InstructorID = null);
+
             _context.Instructors.Remove(instructor);
+
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
@@ -246,7 +279,8 @@ namespace HertfordshireUniversity.Controllers
                     Assigned = instructorCourse.Contains(course.CourseID)
                 });
             }
-            ViewData["Course"] = viewModel;
+            //ViewData["Course"] = viewModel;
+            ViewBag.Courses = viewModel;
         }
 
 
@@ -261,6 +295,7 @@ namespace HertfordshireUniversity.Controllers
             var selectedCoursesHS = new HashSet<string>(selectedCourses);
             var instructorCourses = new HashSet<int>
                 (instructorToUpdate.CourseAssignments.Select(c => c.Course.CourseID));
+
             foreach (var course in _context.Courses)
             {
                 if (selectedCoursesHS.Contains(course.CourseID.ToString()))
