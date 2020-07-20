@@ -86,7 +86,8 @@ namespace HertfordshireUniversity.Controllers
             {
                 return NotFound();
             }
-            ViewData["InstructorID"] = new SelectList(_context.Instructors, "ID", "FullName", department.InstructorID);
+            ViewData["InstructorID"] = new SelectList(_context.Instructors, 
+                "ID", "FullName", department.InstructorID);
             return View(department);
         }
 
@@ -180,7 +181,8 @@ namespace HertfordshireUniversity.Controllers
                     }
                 }
             }
-            ViewData["InstructorID"] = new SelectList(_context.Instructors, "ID", "FullName", departmentToUpdate.InstructorID);
+            ViewData["InstructorID"] = new SelectList(_context.Instructors, 
+                "ID", "FullName", departmentToUpdate.InstructorID);
             return View(departmentToUpdate);
         }
 
